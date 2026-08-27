@@ -10,7 +10,11 @@ pub fn main() !void {
     const stratum_port = parsePort(std.posix.getenv("YARNRAKE_STRATUM_PORT") orelse "3333");
     const http_port = parsePort(std.posix.getenv("PORT") orelse std.posix.getenv("YARNRAKE_PORT") orelse "8787");
 
-    var stratum = pool.stratum.Server{ .cfg = .{ .port = stratum_port, .algo = algo } };
+    const share_path = std.posix.getenv("YARNRAKE_SHARES") orelse "shares.jsonl";
+    var store = pool.store.Store.init(gpa.allocator(), share_path);
+    defer store.deinit();
+
+    var stratum = pool.stratum.Server{ .cfg = .{ .port = stratum_port, .algo = algo }, .store = &store };
     if (stratum_port != 0) {
         const t = try std.Thread.spawn(.{}, pool.stratum.Server.serve, .{&stratum});
         t.detach();
@@ -32,8 +36,8 @@ pub fn main() !void {
         var body_buf: [1024]u8 = undefined;
         const body = if (std.mem.eql(u8, path, "/pool") or std.mem.eql(u8, path, "/pool.json"))
             std.fmt.bufPrint(&body_buf,
-                "{{\"ok\":true,\"algo\":\"{s}\",\"stratum_port\":{d},\"subscribe\":{d},\"authorize\":{d},\"submit\":{d},\"sessions\":{d}}}\n",
-                .{ algo.name(), stratum_port, snap.subscribe, snap.authorize, snap.submit, snap.sessions },
+                "{{\"ok\":true,\"algo\":\"{s}\",\"stratum_port\":{d},\"subscribe\":{d},\"authorize\":{d},\"submit\":{d},\"sessions\":{d},\"miners\":{d},\"shares_total\":{d}}}\n",
+                .{ algo.name(), stratum_port, snap.subscribe, snap.authorize, snap.submit, snap.sessions, store.countMiners(), store.shares_total },
             ) catch "error\n"
         else
             "YarnRake ok — GET /pool\n";
