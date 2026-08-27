@@ -1,6 +1,7 @@
 # YarnRake pool + MagiMDM
 
-Agent mines only if policy mining.enabled is true.
+Agent mines only if policy `mining.enabled` is true.
+MagiMDM: https://github.com/5mil/MagiMDM (`MiningController.kt`).
 
 ```json
 {
@@ -17,7 +18,8 @@ Agent mines only if policy mining.enabled is true.
 }
 ```
 
+When enabled is false or missing, the agent clears `mining_enabled` prefs and will not point at stratum.
 Parental/default templates leave enabled false.
 
-Stratum V1: subscribe, authorize, submit, set_difficulty.
-Chain validation stays in Magister until vendored.
+Stratum V1 here: subscribe, authorize, submit → `shares.jsonl`.
+Chain validation still belongs in Magister until vendored.
