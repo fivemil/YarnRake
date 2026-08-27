@@ -1,6 +1,7 @@
 const std = @import("std");
 const algo_mod = @import("algo.zig");
 const vardiff = @import("vardiff.zig");
+const store_mod = @import("store.zig");
 
 pub const Config = struct {
     port: u16 = 3333,
@@ -13,14 +14,8 @@ pub const Stats = struct {
     authorize: std.atomic.Value(u64) = std.atomic.Value(u64).init(0),
     submit: std.atomic.Value(u64) = std.atomic.Value(u64).init(0),
     sessions: std.atomic.Value(u64) = std.atomic.Value(u64).init(0),
-
     pub fn snapshot(self: *Stats) struct { subscribe: u64, authorize: u64, submit: u64, sessions: u64 } {
-        return .{
-            .subscribe = self.subscribe.load(.monotonic),
-            .authorize = self.authorize.load(.monotonic),
-            .submit = self.submit.load(.monotonic),
-            .sessions = self.sessions.load(.monotonic),
-        };
+        return .{ .subscribe = self.subscribe.load(.monotonic), .authorize = self.authorize.load(.monotonic), .submit = self.submit.load(.monotonic), .sessions = self.sessions.load(.monotonic) };
     }
 };
 
@@ -29,26 +24,16 @@ pub const Server = struct {
     stats: Stats = .{},
     running: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
     vd: vardiff.VarDiff = .{},
+    store: ?*store_mod.Store = null,
 
     pub fn replySubscribe(id: []const u8, extra1: []const u8, buf: []u8) []const u8 {
-        return std.fmt.bufPrint(buf,
-            "{{\"id\":{s},\"result\":[[[\"mining.set_difficulty\",\"1\"],[\"mining.notify\",\"1\"]],\"{s}\",4],\"error\":null}}",
-            .{ id, extra1 },
-        ) catch buf[0..0];
+        return std.fmt.bufPrint(buf, "{{\"id\":{s},\"result\":[[[\"mining.set_difficulty\",\"1\"],[\"mining.notify\",\"1\"]],\"{s}\",4],\"error\":null}}", .{ id, extra1 }) catch buf[0..0];
     }
-
     pub fn replyOk(id: []const u8, buf: []u8) []const u8 {
-        return std.fmt.bufPrint(buf,
-            "{{\"id\":{s},\"result\":true,\"error\":null}}",
-            .{id},
-        ) catch buf[0..0];
+        return std.fmt.bufPrint(buf, "{{\"id\":{s},\"result\":true,\"error\":null}}", .{id}) catch buf[0..0];
     }
-
     pub fn setDifficulty(diff: f64, buf: []u8) []const u8 {
-        return std.fmt.bufPrint(buf,
-            "{{\"id\":null,\"method\":\"mining.set_difficulty\",\"params\":[{d}]}}",
-            .{diff},
-        ) catch buf[0..0];
+        return std.fmt.bufPrint(buf, "{{\"id\":null,\"method\":\"mining.set_difficulty\",\"params\":[{d}]}}", .{diff}) catch buf[0..0];
     }
 
     pub fn serve(self: *Server) !void {
@@ -59,10 +44,7 @@ pub const Server = struct {
         defer listener.deinit();
         std.log.info("[stratum] {s} on 0.0.0.0:{d}", .{ self.cfg.algo.name(), self.cfg.port });
         while (self.running.load(.acquire)) {
-            const conn = listener.accept() catch |err| {
-                std.log.warn("[stratum] accept: {}", .{err});
-                continue;
-            };
+            const conn = listener.accept() catch continue;
             const t = std.Thread.spawn(.{}, session, .{ self, conn.stream }) catch {
                 conn.stream.close();
                 continue;
@@ -75,11 +57,10 @@ pub const Server = struct {
         defer stream.close();
         _ = self.stats.sessions.fetchAdd(1, .monotonic);
         defer _ = self.stats.sessions.fetchSub(1, .monotonic);
-
+        var worker_buf: [64]u8 = [_]u8{0} ** 64;
+        var worker_len: usize = 0;
         var out: [512]u8 = undefined;
-        const diff_line = setDifficulty(self.cfg.start_diff, &out);
-        sendLine(stream, diff_line);
-
+        sendLine(stream, setDifficulty(self.cfg.start_diff, &out));
         var buf: [4096]u8 = undefined;
         var have: usize = 0;
         while (true) {
@@ -89,7 +70,7 @@ pub const Server = struct {
             var search: usize = 0;
             while (std.mem.indexOfScalarPos(u8, buf[0..have], search, '\n')) |nl| {
                 const line = std.mem.trim(u8, buf[search..nl], " \t\r");
-                if (line.len > 0) handleLine(self, stream, line);
+                if (line.len > 0) handleLine(self, stream, line, &worker_buf, &worker_len);
                 search = nl + 1;
             }
             if (search > 0) {
@@ -100,7 +81,7 @@ pub const Server = struct {
         }
     }
 
-    fn handleLine(self: *Server, stream: std.net.Stream, line: []const u8) void {
+    fn handleLine(self: *Server, stream: std.net.Stream, line: []const u8, worker_buf: *[64]u8, worker_len: *usize) void {
         const method = extractJsonField(line, "method") orelse return;
         const id = extractJsonField(line, "id") orelse "null";
         var out: [512]u8 = undefined;
@@ -109,13 +90,30 @@ pub const Server = struct {
             sendLine(stream, replySubscribe(id, "yr01", &out));
         } else if (std.mem.eql(u8, method, "mining.authorize")) {
             _ = self.stats.authorize.fetchAdd(1, .monotonic);
+            if (firstQuoted(line)) |w| {
+                const n = @min(w.len, worker_buf.len);
+                @memcpy(worker_buf[0..n], w[0..n]);
+                worker_len.* = n;
+                if (self.store) |st| st.touch(worker_buf[0..n]);
+            }
             sendLine(stream, replyOk(id, &out));
         } else if (std.mem.eql(u8, method, "mining.submit")) {
             _ = self.stats.submit.fetchAdd(1, .monotonic);
+            const w = if (worker_len.* > 0) worker_buf[0..worker_len.*] else "anon";
+            if (self.store) |st| st.accept(w, self.cfg.algo.name(), self.cfg.start_diff);
             sendLine(stream, replyOk(id, &out));
         }
     }
 };
+
+fn firstQuoted(line: []const u8) ?[]const u8 {
+    const p = std.mem.indexOf(u8, line, "\"params\"") orelse return null;
+    const q1 = std.mem.indexOfScalarPos(u8, line, p, '"') orelse return null;
+    const q2 = std.mem.indexOfScalarPos(u8, line, q1 + 1, '"') orelse return null;
+    const q3 = std.mem.indexOfScalarPos(u8, line, q2 + 1, '"') orelse return null;
+    const q4 = std.mem.indexOfScalarPos(u8, line, q3 + 1, '"') orelse return null;
+    return line[q3 + 1 .. q4];
+}
 
 fn sendLine(stream: std.net.Stream, msg: []const u8) void {
     stream.writeAll(msg) catch return;
