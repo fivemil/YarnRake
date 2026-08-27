@@ -72,3 +72,24 @@ CREATE TABLE IF NOT EXISTS shares (
     accepted INTEGER NOT NULL DEFAULT 1,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+-- Local mining device onboarding (all hardware classes)
+CREATE TABLE IF NOT EXISTS mining_devices (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    uuid TEXT NOT NULL UNIQUE,
+    name TEXT NOT NULL,
+    device_type TEXT NOT NULL CHECK (device_type IN (
+        'cpu', 'gpu', 'asic', 'mobile', 'hybrid', 'other'
+    )),
+    platform TEXT NOT NULL DEFAULT 'linux',
+    worker TEXT NOT NULL,
+    algo TEXT,
+    software TEXT,
+    stratum_url TEXT,
+    status TEXT NOT NULL DEFAULT 'registered',
+    capability_json TEXT NOT NULL DEFAULT '{}',
+    last_seen_at TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_mining_devices_type ON mining_devices(device_type);
+CREATE INDEX IF NOT EXISTS idx_mining_devices_worker ON mining_devices(worker);
