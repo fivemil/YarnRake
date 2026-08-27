@@ -1,74 +1,88 @@
-# YarnRake algorithms & integrated miners
+# YarnRake algorithm & miner support
 
-YarnRake is a **multi-algo stratum front-end**, not a full replacement for every coin daemon.
+## Honest scope
 
-| Layer | What it does |
-|-------|----------------|
-| **Registry** | `GET /algos` — popular PoW names, hardware class, recommended miner |
-| **Stratum** | One active algo per process (`YARNRAKE_ALGO`) on `:3333` |
-| **Validation** | Always: job id + nonce format, stale, dup. **Native PoW:** `sha256d` lab only |
-| **Integrated software** | Shell launchers under `tools/miners/` for xmrig / cpuminer-opt / lolMiner |
+| Layer | Status |
+|-------|--------|
+| **Registry** (`GET /algos`) | Full popular-algo catalog (CPU / GPU / ASIC) |
+| **Stratum V1** | Accepts connections for any configured algo; job/notify + share format gates |
+| **Native PoW validate** | Lab **SHA256d** only today; Skein / Yescrypt stubbed |
+| **Integrated software** | Launcher scripts + catalog — **does not ship** proprietary miner binaries |
 
-## Popular algorithms (registry)
+"All popular algorithms" means: **name, hardware class, coin hints, recommended miner, and stratum path**. Production-grade hash verification per coin is a multi-release roadmap (often needs C/ASM libraries or a full node).
 
-| Id | Hardware | Status | Typical coins | Integrated miner |
-|----|----------|--------|---------------|------------------|
-| `skein` | CPU | stratum_stub | DigiByte | cpuminer-opt |
-| `yescrypt_r16` | CPU | stratum_stub | DigiByte | cpuminer-opt |
-| `randomx` | CPU | external | Monero | **xmrig** |
-| `ghostrider` | CPU | external | Raptoreum | xmrig |
-| `argon2d` | CPU | external | various | cpuminer-opt |
-| `kawpow` | GPU | external | Ravencoin | lolMiner / T-Rex |
-| `etchash` | GPU | external | Ethereum Classic | lolMiner |
-| `ethash` | GPU | external | ETH forks | lolMiner |
-| `autolykos2` | GPU | external | Ergo | lolMiner / SRBMiner |
-| `equihash` | GPU/ASIC | external | Zcash | lolMiner / miniZ |
-| `verthash` | GPU | external | Vertcoin | verthashminer |
-| `blake3` | GPU | external | Alephium / Decred | lolMiner |
-| `octopus` | GPU | external | Conflux | T-Rex |
-| `sha256d` | ASIC | **native_validate** (lab) | Bitcoin | cpuminer-opt |
-| `scrypt` | ASIC | external | Litecoin / DOGE | cpuminer-opt |
-| `x11` | ASIC | external | Dash | cpuminer-opt |
-| `kheavyhash` | ASIC | external | Kaspa | SRBMiner |
-| `neoscrypt` | GPU | external | Feathercoin etc. | cpuminer-opt |
-| `lyra2rev3` | GPU | external | legacy VTC | cpuminer-opt |
-| `blake2b` / `blake2s` | mixed | external | Sia / Kadena | cpuminer-opt |
+## Algorithm matrix
 
-`stratum_stub` / `external` = pool accepts well-formed shares after authorize; **does not** prove chain work until a real hash module is wired (Magister or coin daemon).
+| Algo | HW | Coins (examples) | Integrated miner | Validate |
+|------|-----|------------------|------------------|----------|
+| `sha256d` | ASIC | BTC, BCH | cgminer, cpuminer-opt | **native lab** |
+| `scrypt` | ASIC | LTC, DOGE | cgminer, cpuminer-opt | external |
+| `randomx` | CPU | XMR | **xmrig** | external |
+| `randomx_wow` | CPU | WOW | xmrig | external |
+| `ghostrider` | CPU | RTM | xmrig | external |
+| `kawpow` | GPU | RVN | lolMiner, T-Rex, SRB | external |
+| `etchash` | GPU | ETC | lolMiner, T-Rex | external |
+| `ethash` | GPU | ETHW | lolMiner | external |
+| `autolykos2` | GPU | ERG | lolMiner, T-Rex | external |
+| `equihash` | GPU | ZEC, Flux | lolMiner, miniZ | external |
+| `blake3` | GPU | ALPH | lolMiner, BzMiner | external |
+| `octopus` | GPU | CFX | T-Rex | external |
+| `fishhash` | GPU | IRON | lolMiner, SRB | external |
+| `kheavyhash` | ASIC/GPU | KAS | SRB, cpuminer | external |
+| `eaglesong` | ASIC | CKB | SRB | external |
+| `x11` | ASIC | DASH | cpuminer-opt | external |
+| `skein` | CPU | DGB | **cpuminer-opt** | stratum stub |
+| `yescrypt_r16` | CPU | DGB | **cpuminer-opt** | stratum stub |
+| `verthash` | GPU | VTC | VerthashMiner | external |
+| `cuckatoo32` | GPU | GRIN | lolMiner | external |
+| `neoscrypt` / `lyra2rev3` / `blake2b` / `blake2s` / `argon2d` | mixed | various | cpuminer-opt / SRB | external |
 
-## Run
+## Integrated mining software
 
-```bash
-YARNRAKE_ALGO=skein zig-out/bin/yarnrake
-YARNRAKE_ALGO=sha256d zig-out/bin/yarnrake
-YARNRAKE_ALGO=randomx zig-out/bin/yarnrake
-```
+Install or place binaries on `PATH`, then:
 
 ```bash
-./tools/miners/run_xmrig.sh
-./tools/miners/run_cpuminer.sh
-YARNRAKE_ALGO=kawpow ./tools/miners/run_lolminer.sh
+# one-time hints / download links
+./tools/miners/setup.sh
+
+# CPU RandomX
+YARNRAKE_WORKER=pc1 YARNRAKE_ALGO=randomx ./tools/miners/run_xmrig.sh
+
+# DigiByte-style CPU
+YARNRAKE_WORKER=dgb1 YARNRAKE_ALGO=skein ./tools/miners/run_cpuminer.sh
+
+# GPU KawPow
+YARNRAKE_WORKER=gpu1 YARNRAKE_ALGO=kawpow ./tools/miners/run_lolminer.sh
 ```
 
-```bash
-curl -s http://127.0.0.1:8787/algos | jq .
-curl -s http://127.0.0.1:8787/pool  | jq .
-```
+Catalog JSON: `GET /miners`
 
-## MagiMDM policy
+## Multi-algo ports (optional)
 
-```json
-"mining": {
-  "enabled": false,
-  "algo": "randomx",
-  "stratum_url": "stratum+tcp://pool.example:3333",
-  "max_cpu_pct": 25
-}
-```
+Base stratum port `3333` + per-algo offset (see `Algo.portOffset`):
 
-## Honest limits
+| Port | Typical algo |
+|------|----------------|
+| 3333 | default / sha256d |
+| 3334 | scrypt |
+| 3335 | randomx |
+| 3336 | kawpow |
+| 3337 | etchash/ethash |
+| 3338 | autolykos2 |
+| 3339 | kheavyhash |
+| 3340 | skein / yescrypt |
 
-- Not embedding XMRig/lolMiner binaries in the Zig binary (license + size).
-- Not validating RandomX/KawPow in pure Zig in this tree yet.
-- Multi-coin payouts still need a wallet/daemon or Magister vault.
-- ASIC farms are out of scope for a 1–10 device MDM companion.
+Set `YARNRAKE_ALGO=randomx` on the server process for the primary listener; multi-listener expansion is on the roadmap.
+
+## MagiMDM
+
+Mobile agents only mine when policy has `mining.enabled: true`. Prefer **desktop/ASIC** for real hashrate; phones stay optional and throttled (`max_cpu_pct`).
+
+## API
+
+| Path | Returns |
+|------|---------|
+| `GET /algos` | Full algo list + hw + status + miner hint |
+| `GET /miners` | Integrated software catalog |
+| `GET /pool` | Live shares / sessions |
+| `GET /onboard` | Register a local device |

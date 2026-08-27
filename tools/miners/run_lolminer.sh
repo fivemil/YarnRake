@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# Integrated miner helper: lolMiner (GPU) → local YarnRake stratum
 set -euo pipefail
 HOST="${YARNRAKE_HOST:-127.0.0.1}"
 PORT="${YARNRAKE_STRATUM_PORT:-3333}"
@@ -12,6 +11,8 @@ case "$ALGO" in
   autolykos2|autolykos) LA="AUTOLYKOS2" ;;
   equihash) LA="EQUI144_5" ;;
   blake3) LA="BLAKE3" ;;
+  fishhash) LA="FISHHASH" ;;
+  cuckatoo32|cuckatoo) LA="C32" ;;
   *) LA="KAWPOW"; echo "note: lolMiner defaulting to KAWPOW for algo=$ALGO" ;;
 esac
 exec lolMiner --algo "$LA" --pool "${HOST}:${PORT}" --user "$USER" "$@"
