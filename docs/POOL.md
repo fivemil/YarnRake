@@ -1,25 +1,9 @@
-# YarnRake pool + MagiMDM
+# YarnRake pool
 
-Agent mines only if policy `mining.enabled` is true.
-MagiMDM: https://github.com/5mil/MagiMDM (`MiningController.kt`).
+Stratum V1 on :3333: subscribe → set_difficulty + mining.notify (placeholder job `yr-N`) → authorize → submit → shares.jsonl.
 
-```json
-{
-  "schema": 1,
-  "template": "work",
-  "mining": {
-    "enabled": false,
-    "algo": "skein",
-    "stratum_url": "stratum+tcp://127.0.0.1:3333",
-    "worker": "device-uuid",
-    "max_cpu_pct": 25,
-    "schedule": "02:00-06:00"
-  }
-}
-```
+`GET /pool` includes subscribe/authorize/submit/sessions/miners/shares_total/rejected_total.
 
-When enabled is false or missing, the agent clears `mining_enabled` prefs and will not point at stratum.
-Parental/default templates leave enabled false.
+Lab: `python3 tools/stratum_client.py --user phone-1 --duration 20`
 
-Stratum V1 here: subscribe, authorize, submit → `shares.jsonl`.
-Chain validation still belongs in Magister until vendored.
+Hash validation still pending Magister vendor. Mining only if MagiMDM policy mining.enabled.
