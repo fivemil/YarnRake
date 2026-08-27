@@ -1,44 +1,48 @@
 # YarnRake
 
-Self-hosted **device management** plus an **optional mining pool**.
+Self-hosted **optional mining pool** companion to [MagiMDM](https://github.com/5mil/MagiMDM), with a **multi-algorithm registry** and **integrated miner launchers**.
 
-Repo: https://github.com/fivemil/YarnRake  
-Sibling MDM source: https://github.com/5mil/MagiMDM  
-Pool lineage: [5mil/magister](https://github.com/5mil/magister) Stratum V1 (Zig)
+Repo: https://github.com/fivemil/YarnRake
 
-## What stayed from the old YarnRake
+## Algorithms
 
-| Keep | Why |
-|------|-----|
-| Repo + name | Org write target |
-| **Skein-512** | DigiByte algo YarnRake advertised |
-| **YescryptR16** | Second DigiByte algo YarnRake advertised |
-| Small-fleet / self-host | Same scale as MagiMDM (1-10 devices) |
+**20+ popular PoW names** registered (`GET /algos`): RandomX, KawPow, Etchash, Autolykos2, Equihash, SHA256d, Scrypt, X11, Skein, YescryptR16, GhostRider, kHeavyHash, Blake3, and more.
 
-## What was discarded
+| Status | Meaning |
+|--------|--------|
+| `native_validate` | Zig checks lab PoW (`sha256d` today) |
+| `stratum_stub` | Jobs + format/dup/stale (Skein / Yescrypt lineage) |
+| `external` | Point **xmrig / cpuminer-opt / lolMiner** at this stratum |
 
-| Drop | Why |
-|------|-----|
-| SARN | Slogan only — no code |
-| Rake integration wrapper | Empty |
-| CI/Colab free-hash benches | Not for managed phones |
+Full table: [docs/ALGORITHMS.md](docs/ALGORITHMS.md)
 
-See [docs/ARCHIVE.md](docs/ARCHIVE.md).
+## Integrated mining software
 
-Mining is a **policy flag**, off by default. Only on devices you own.
+Launchers (binaries **not** bundled — install from upstream):
+
+| Script | Software |
+|--------|----------|
+| `tools/miners/run_xmrig.sh` | [XMRig](https://github.com/xmrig/xmrig) — RandomX, GhostRider |
+| `tools/miners/run_cpuminer.sh` | [cpuminer-opt](https://github.com/JayDDee/cpuminer-opt) — Skein, Yescrypt, Scrypt, … |
+| `tools/miners/run_lolminer.sh` | [lolMiner](https://github.com/Lolliedieb/lolMiner-releases) — KawPow, Etchash, … |
+
+Lab client: `python3 tools/stratum_client.py`
 
 ## Quick start
 
 ```bash
-zig test src/pool.zig
 zig build
-./zig-out/bin/yarnrake
+YARNRAKE_ALGO=randomx ./zig-out/bin/yarnrake
+# http://127.0.0.1:8787/algos
+# stratum+tcp://127.0.0.1:3333
 ```
 
-| Variable | Default |
-|----------|--------|
-| `YARNRAKE_PORT` / `PORT` | 8787 |
-| `YARNRAKE_STRATUM_PORT` | 3333 |
-| `YARNRAKE_ALGO` | skein |
+| Env | Default |
+|-----|--------|
+| `YARNRAKE_ALGO` | `skein` |
+| `YARNRAKE_STRATUM_PORT` | `3333` (`0` = off) |
+| `PORT` | `8787` |
 
-Docs: [POOL](docs/POOL.md) · [TEMPLATES](docs/TEMPLATES.md) · MagiMDM: https://github.com/5mil/MagiMDM
+## MagiMDM
+
+Mining stays **off** unless policy sets `mining.enabled`.

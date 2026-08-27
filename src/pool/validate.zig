@@ -1,6 +1,8 @@
+//! Share checks: job/nonce format, dup, stale, optional native PoW.
 const std = @import("std");
+const algo_mod = @import("algo.zig");
 
-pub const Verdict = enum { accept, stale_job, dup, bad_format };
+pub const Verdict = enum { accept, stale_job, dup, bad_format, bad_pow };
 
 pub const Seen = struct {
     job_id: [32]u8 = [_]u8{0} ** 32,
@@ -14,6 +16,8 @@ pub const Gate = struct {
     current_len: usize = 0,
     seen: [32]Seen = [_]Seen{.{}} ** 32,
     seen_n: usize = 0,
+    algo: algo_mod.Algo = .skein,
+    difficulty: f64 = 0.01,
 
     pub fn setJob(self: *Gate, job_id: []const u8) void {
         const n = @min(job_id.len, self.current_job.len);
@@ -29,8 +33,15 @@ pub const Gate = struct {
         var i: usize = 0;
         while (i < self.seen_n) : (i += 1) {
             const s = self.seen[i];
-            if (std.mem.eql(u8, nonce, s.nonce[0..s.nonce_len]) and std.mem.eql(u8, job_id, s.job_id[0..s.job_len]))
+            if (std.mem.eql(u8, nonce, s.nonce[0..s.nonce_len]) and
+                std.mem.eql(u8, job_id, s.job_id[0..s.job_len]))
                 return .dup;
+        }
+        if (self.algo.status() == .native_validate) {
+            if (self.algo == .sha256d) {
+                if (!algo_mod.validateSha256dLab(job_id, nonce, self.difficulty))
+                    return .bad_pow;
+            }
         }
         if (self.seen_n < self.seen.len) {
             var row = Seen{};
