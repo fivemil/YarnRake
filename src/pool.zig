@@ -6,3 +6,4 @@ pub const stratum = @import("pool/stratum.zig");
 pub const store = @import("pool/store.zig");
 pub const job = @import("pool/job.zig");
 pub const validate = @import("pool/validate.zig");
+pub const onboard = @import("pool/onboard.zig");
