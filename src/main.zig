@@ -69,6 +69,8 @@ pub fn main() !void {
         } else if (std.mem.eql(u8, path, "/types")) {
             ctype = "application/json";
             body = "{\"ok\":true,\"types\":[{\"id\":\"cpu\"},{\"id\":\"gpu\"},{\"id\":\"asic\"},{\"id\":\"mobile\"},{\"id\":\"hybrid\"},{\"id\":\"other\"}]}\n";
+        } else if (std.mem.eql(u8, path, "/launch")) {
+            body = @import("launch_page.zig").html();
         } else {
             body = dashHtml();
         }
@@ -112,14 +114,12 @@ fn bodyOf(req: []const u8) ?[]const u8 {
 }
 
 fn formOrJson(body: []const u8, key: []const u8) ?[]const u8 {
-    // form: key=value
     var it = std.mem.splitScalar(u8, body, '&');
     while (it.next()) |pair| {
         if (std.mem.indexOfScalar(u8, pair, '=')) |eq| {
             if (std.mem.eql(u8, pair[0..eq], key)) return pair[eq + 1 ..];
         }
     }
-    // naive json "key":"value"
     var needle_buf: [64]u8 = undefined;
     const needle = std.fmt.bufPrint(&needle_buf, "\"{s}\":\"", .{key}) catch return null;
     if (std.mem.indexOf(u8, body, needle)) |i| {
@@ -167,7 +167,7 @@ fn parsePath(req: []const u8) []const u8 {
     return p;
 }
 fn dashHtml() []const u8 {
-    return "<!doctype html><html><head><meta charset=utf-8><title>YarnRake</title></head><body style=\"background:#0f1117;color:#eee;font-family:sans-serif;padding:24px\"><h1>YarnRake</h1><p><a href=/onboard style=color:#5e9bdc>Onboard device</a> · <a href=/devices style=color:#5e9bdc>Devices</a> · <a href=/pool style=color:#5e9bdc>Pool</a> · <a href=/types style=color:#5e9bdc>Types</a> · <a href=/algos style=color:#5e9bdc>Algos</a> · <a href=/miners style=color:#5e9bdc>Miners</a></p><p>CPU · GPU · ASIC · mobile · hybrid</p></body></html>";
+    return "<!doctype html><html><head><meta charset=utf-8><title>YarnRake</title></head><body style=\"background:#0f1117;color:#eee;font-family:sans-serif;padding:24px\"><h1>YarnRake</h1><p><a href=/onboard style=color:#5e9bdc>Onboard device</a> · <a href=/devices style=color:#5e9bdc>Devices</a> · <a href=/pool style=color:#5e9bdc>Pool</a> · <a href=/types style=color:#5e9bdc>Types</a> · <a href=/algos style=color:#5e9bdc>Algos</a> · <a href=/miners style=color:#5e9bdc>Miners</a> · <a href=/launch style=color:#8f8>Launch</a></p><p>CPU · GPU · ASIC · mobile · hybrid</p></body></html>";
 }
 fn onboardHtml() []const u8 {
     return "<!doctype html><html><head><meta charset=utf-8><title>Onboard</title></head><body style=\"background:#0f1117;color:#eee;font-family:sans-serif;padding:24px\"><h1>Onboard mining device</h1><form id=f><p>Name <input name=name required></p><p>Type <select name=type><option>cpu</option><option>gpu</option><option>asic</option><option>mobile</option><option>hybrid</option><option>other</option></select></p><p>Worker <input name=worker required></p><p>Algo <input name=algo></p><p>Software <input name=software></p><p>Platform <input name=platform value=linux></p><button>Register</button></form><pre id=out></pre><script>document.getElementById('f').onsubmit=async(e)=>{e.preventDefault();const b=new URLSearchParams(new FormData(e.target));const r=await fetch('/onboard',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:b});document.getElementById('out').textContent=await r.text();};</script></body></html>";

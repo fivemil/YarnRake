@@ -28,21 +28,23 @@ Launchers (binaries **not** bundled — install from upstream):
 
 Lab client: `python3 tools/stratum_client.py`
 
+
+## Quick launch console
+
+```bash
+zig build && ./zig-out/bin/yarnrake
+# open http://127.0.0.1:8787/launch  — checkboxes → copy command
+./tools/fleet_launch.sh --all-lab
+```
+
+Full flags: [docs/LAUNCH.md](docs/LAUNCH.md)
+
 ## Quick start
 
 ```bash
 zig build
 YARNRAKE_ALGO=randomx ./zig-out/bin/yarnrake
+# http://127.0.0.1:8787/launch
 # http://127.0.0.1:8787/algos
 # stratum+tcp://127.0.0.1:3333
 ```
-
-| Env | Default |
-|-----|--------|
-| `YARNRAKE_ALGO` | `skein` |
-| `YARNRAKE_STRATUM_PORT` | `3333` (`0` = off) |
-| `PORT` | `8787` |
-
-## MagiMDM
-
-Mining stays **off** unless policy sets `mining.enabled`.
