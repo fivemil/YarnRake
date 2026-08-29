@@ -1,0 +1,58 @@
+# Stratum connectivity smoke test ONLY (≤120s). Not a mining farm.
+name: stratum-smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      host:
+        description: "Pool host (or repo variable YARNRAKE_HOST)"
+        required: false
+        default: ""
+      worker:
+        description: "Worker name"
+        required: false
+        default: "gha-smoke"
+      duration:
+        description: "Seconds (max 120)"
+        required: false
+        default: "60"
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve host + clamp duration
+        id: cfg
+        env:
+          INPUT_HOST: ${{ github.event.inputs.host }}
+          INPUT_DUR: ${{ github.event.inputs.duration }}
+          VAR_HOST: ${{ vars.YARNRAKE_HOST }}
+          SECRET_HOST: ${{ secrets.YARNRAKE_HOST }}
+        run: |
+          HOST="${INPUT_HOST:-}"
+          if [ -z "$HOST" ]; then HOST="${VAR_HOST:-}"; fi
+          if [ -z "$HOST" ]; then HOST="${SECRET_HOST:-}"; fi
+          if [ -z "$HOST" ] || [ "$HOST" = "127.0.0.1" ] || [ "$HOST" = "localhost" ]; then
+            echo "No public YARNRAKE_HOST — skip"
+            echo "skip=1" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          DUR="${INPUT_DUR:-60}"
+          if [ "$DUR" -gt 120 ]; then DUR=120; fi
+          if [ "$DUR" -lt 5 ]; then DUR=5; fi
+          echo "host=$HOST" >> "$GITHUB_OUTPUT"
+          echo "dur=$DUR" >> "$GITHUB_OUTPUT"
+          echo "skip=0" >> "$GITHUB_OUTPUT"
+
+      - name: Lab stratum client
+        if: steps.cfg.outputs.skip != '1'
+        env:
+          HOST: ${{ steps.cfg.outputs.host }}
+          DUR: ${{ steps.cfg.outputs.dur }}
+          WORKER: ${{ github.event.inputs.worker || 'gha-smoke' }}
+        run: |
+          python3 tools/stratum_client.py \
+            --host "$HOST" --port 3333 --user "$WORKER" --duration "$DUR"

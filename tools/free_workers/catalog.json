@@ -1,0 +1,72 @@
+{
+  "version": 1,
+  "note": "Only backends that can run within free-tier limits. No CI hash farms.",
+  "backends": [
+    {
+      "id": "local-lab",
+      "title": "Local lab stratum client",
+      "enabled": true,
+      "kind": "lab_client",
+      "max_duration_s": 3600,
+      "default_duration_s": 120,
+      "needs_public_pool": false,
+      "cost": "free",
+      "limits": "Uses your CPU lightly; lab client only (not full PoW miner)."
+    },
+    {
+      "id": "docker-lab",
+      "title": "Docker lab client",
+      "enabled": true,
+      "kind": "lab_client",
+      "max_duration_s": 3600,
+      "default_duration_s": 300,
+      "needs_public_pool": false,
+      "cost": "free",
+      "limits": "Requires Docker. Stops when duration ends or container stopped."
+    },
+    {
+      "id": "compose-worker",
+      "title": "Compose profile workers",
+      "enabled": true,
+      "kind": "compose",
+      "max_duration_s": 86400,
+      "default_duration_s": 86400,
+      "needs_public_pool": false,
+      "cost": "free",
+      "limits": "Tied to local docker compose stack; not a cloud free tier."
+    },
+    {
+      "id": "fly-lab",
+      "title": "Fly.io one-shot lab worker",
+      "enabled": true,
+      "kind": "fly_machines",
+      "max_duration_s": 600,
+      "default_duration_s": 180,
+      "needs_public_pool": true,
+      "cost": "fly_free_allowance",
+      "limits": "Max 600s per spin. Needs flyctl + public YARNRAKE_HOST. Not for sustained mining."
+    },
+    {
+      "id": "smoke-ci",
+      "title": "GitHub Actions stratum smoke (≤2 min)",
+      "enabled": true,
+      "kind": "github_actions",
+      "max_duration_s": 120,
+      "default_duration_s": 60,
+      "needs_public_pool": true,
+      "cost": "actions_minutes",
+      "limits": "Connectivity test only. Will not run longer than 120s. Not a mining farm."
+    },
+    {
+      "id": "oracle-hint",
+      "title": "Oracle Always Free (manual)",
+      "enabled": false,
+      "kind": "manual",
+      "max_duration_s": 0,
+      "default_duration_s": 0,
+      "needs_public_pool": true,
+      "cost": "always_free_vm",
+      "limits": "No auto spin — provision VM yourself if ToS allows."
+    }
+  ]
+}
