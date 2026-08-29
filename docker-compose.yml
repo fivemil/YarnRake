@@ -1,0 +1,32 @@
+# Local or VPS: control plane + optional lab worker
+#   docker compose up -d yarnrake
+#   docker compose --profile workers up -d
+services:
+  yarnrake:
+    build: .
+    ports:
+      - "8787:8787"
+      - "3333:3333"
+    environment:
+      YARNRAKE_ALGO: ${YARNRAKE_ALGO:-skein}
+      YARNRAKE_PORT: "8787"
+      YARNRAKE_STRATUM_PORT: "3333"
+      YARNRAKE_SHARES: /data/shares.jsonl
+      YARNRAKE_DEVICES: /data/devices.jsonl
+    volumes:
+      - yr-data:/data
+    restart: unless-stopped
+
+  lab-worker:
+    profiles: ["workers"]
+    image: python:3.12-slim
+    depends_on:
+      - yarnrake
+    working_dir: /app
+    volumes:
+      - ./tools/stratum_client.py:/app/stratum_client.py:ro
+    command: ["python3", "stratum_client.py", "--host", "yarnrake", "--port", "3333", "--user", "lab-docker", "--duration", "86400"]
+    restart: unless-stopped
+
+volumes:
+  yr-data:

@@ -8,26 +8,15 @@ Repo: https://github.com/fivemil/YarnRake
 
 **20+ popular PoW names** registered (`GET /algos`): RandomX, KawPow, Etchash, Autolykos2, Equihash, SHA256d, Scrypt, X11, Skein, YescryptR16, GhostRider, kHeavyHash, Blake3, and more.
 
-| Status | Meaning |
-|--------|--------|
-| `native_validate` | Zig checks lab PoW (`sha256d` today) |
-| `stratum_stub` | Jobs + format/dup/stale (Skein / Yescrypt lineage) |
-| `external` | Point **xmrig / cpuminer-opt / lolMiner** at this stratum |
-
 Full table: [docs/ALGORITHMS.md](docs/ALGORITHMS.md)
 
 ## Integrated mining software
 
-Launchers (binaries **not** bundled — install from upstream):
-
 | Script | Software |
 |--------|----------|
-| `tools/miners/run_xmrig.sh` | [XMRig](https://github.com/xmrig/xmrig) — RandomX, GhostRider |
-| `tools/miners/run_cpuminer.sh` | [cpuminer-opt](https://github.com/JayDDee/cpuminer-opt) — Skein, Yescrypt, Scrypt, … |
-| `tools/miners/run_lolminer.sh` | [lolMiner](https://github.com/Lolliedieb/lolMiner-releases) — KawPow, Etchash, … |
-
-Lab client: `python3 tools/stratum_client.py`
-
+| `tools/miners/run_xmrig.sh` | XMRig — RandomX, GhostRider |
+| `tools/miners/run_cpuminer.sh` | cpuminer-opt — Skein, Yescrypt, Scrypt, … |
+| `tools/miners/run_lolminer.sh` | lolMiner — KawPow, Etchash, … |
 
 ## Quick launch console
 
@@ -37,7 +26,7 @@ zig build && ./zig-out/bin/yarnrake
 ./tools/fleet_launch.sh --all-lab
 ```
 
-Full flags: [docs/LAUNCH.md](docs/LAUNCH.md)
+Full flags: [docs/LAUNCH.md](docs/LAUNCH.md) · Cloud: [docs/CLOUD.md](docs/CLOUD.md)
 
 ## Quick start
 
@@ -45,6 +34,21 @@ Full flags: [docs/LAUNCH.md](docs/LAUNCH.md)
 zig build
 YARNRAKE_ALGO=randomx ./zig-out/bin/yarnrake
 # http://127.0.0.1:8787/launch
-# http://127.0.0.1:8787/algos
 # stratum+tcp://127.0.0.1:3333
 ```
+
+## Cloud (control plane + workers)
+
+```bash
+# VPS / home server
+docker compose up -d --build yarnrake
+
+# Fly.io
+fly deploy
+
+# Worker VM → your pool
+export YARNRAKE_HOST=your.pool.ip
+./tools/cloud_worker_setup.sh --xmrig
+```
+
+Details: [docs/CLOUD.md](docs/CLOUD.md)

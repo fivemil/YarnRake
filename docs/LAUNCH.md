@@ -65,3 +65,10 @@ Parental / Work / Monitor templates keep **mining off** by default.
 | YarnRake HTTP | 8787 |
 | YarnRake stratum | 3333 |
 | MagiMDM HTTP | 8788 (when launched via script) |
+
+## Cloud
+
+For **Fly / Docker VPS / worker VMs**, see **[CLOUD.md](./CLOUD.md)**.
+
+- Control plane: `docker compose up -d --build` or `fly deploy`
+- Workers: separate VM + `tools/cloud_worker_setup.sh --xmrig`

@@ -1,0 +1,28 @@
+# Render Blueprint — YarnRake control plane
+# Free tier sleeps when idle — use paid or VPS for live stratum.
+
+services:
+  - type: web
+    name: yarnrake
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /pool
+    envVars:
+      - key: YARNRAKE_ALGO
+        value: skein
+      - key: YARNRAKE_PORT
+        value: "8787"
+      - key: PORT
+        value: "8787"
+      - key: YARNRAKE_STRATUM_PORT
+        value: "3333"
+      - key: YARNRAKE_SHARES
+        value: /data/shares.jsonl
+      - key: YARNRAKE_DEVICES
+        value: /data/devices.jsonl
+    disk:
+      name: yr-data
+      mountPath: /data
+      sizeGB: 1

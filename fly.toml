@@ -1,0 +1,53 @@
+# Fly.io — YarnRake control plane (HTTP + Stratum)
+#   fly auth login
+#   fly apps create yarnrake-pool
+#   fly volumes create yr_data --size 1 --region iad
+#   fly deploy
+
+app = "yarnrake-pool"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  YARNRAKE_ALGO = "skein"
+  YARNRAKE_PORT = "8787"
+  YARNRAKE_STRATUM_PORT = "3333"
+  YARNRAKE_SHARES = "/data/shares.jsonl"
+  YARNRAKE_DEVICES = "/data/devices.jsonl"
+  PORT = "8787"
+
+[mounts]
+  source = "yr_data"
+  destination = "/data"
+
+[[services]]
+  internal_port = 8787
+  protocol = "tcp"
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [[services.ports]]
+    port = 80
+    handlers = ["http"]
+  [[services.ports]]
+    port = 443
+    handlers = ["tls", "http"]
+
+  [[services.http_checks]]
+    interval = "30s"
+    timeout = "5s"
+    method = "GET"
+    path = "/pool"
+
+[[services]]
+  internal_port = 3333
+  protocol = "tcp"
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[services.ports]]
+    port = 3333
