@@ -1,31 +1,33 @@
 # Miner control pool console
 
-**URL:** http://127.0.0.1:8787/control
+**URL:** `http://127.0.0.1:8787/control` (after `main.zig` is wired — see [CONTROL_WIRE.md](./CONTROL_WIRE.md))
 
-Assign **any or all** registered pools to workers, with operational modes.
+Assign **any or all** registered pools to workers.
 
 ## Modes
 
 | Mode | Behavior |
 |------|----------|
-| **manual** | Use listed pool id(s) only |
+| **manual** | Listed pool id(s) only |
 | **automatic** | Enabled pools matching worker algo |
-| **failover** | Ordered list (priority / list order) |
+| **failover** | Ordered list / priority |
 | **round_robin** | Rotate among selected pools |
 | **all_pools** | Every enabled pool |
-| **custom** | Free-form stratum URL (ignores registry) |
+| **custom** | Free-form stratum URL |
 
 Unassigned workers resolve as **automatic**.
 
 ## API
 
-| Method | Path | Purpose |
-|--------|------|---------|
-| GET | `/control` | Console UI |
-| GET | `/control/state` | Pools + assignments JSON |
-| GET | `/control/resolve?worker=&algo=` | Effective URL list |
-| POST | `/control/pools` | Add pool |
-| POST | `/control/pools/enable` | Enable/disable |
-| POST | `/control/assign` | Assign worker mode + pools |
+| Method | Path |
+|--------|------|
+| GET | `/control` |
+| GET | `/control/state` |
+| GET | `/control/resolve?worker=&algo=` |
+| POST | `/control/pools` |
+| POST | `/control/pools/enable` |
+| POST | `/control/assign` |
 
-Persistence: `control.tsv` (or `YARNRAKE_CONTROL`).
+Persistence: `control.tsv` (`YARNRAKE_CONTROL`).
+
+Core board: `src/pool/control.zig`.
