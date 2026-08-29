@@ -1,0 +1,16 @@
+[Unit]
+Description=YarnRake home worker (%i)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=-/etc/yarnrake/worker.env
+ExecStart=/bin/bash -c 'ROOT="${YARNRAKE_ROOT:-/opt/YarnRake}"; case "%i" in xmrig) exec bash "$ROOT/tools/miners/run_xmrig.sh";; cpuminer) exec bash "$ROOT/tools/miners/run_cpuminer.sh";; lolminer) exec bash "$ROOT/tools/miners/run_lolminer.sh";; *) exit 1;; esac'
+Restart=always
+RestartSec=15
+User=miner
+Group=miner
+
+[Install]
+WantedBy=multi-user.target
