@@ -7,3 +7,4 @@ pub const store = @import("pool/store.zig");
 pub const job = @import("pool/job.zig");
 pub const validate = @import("pool/validate.zig");
 pub const onboard = @import("pool/onboard.zig");
+pub const control = @import("pool/control.zig");
