@@ -2,6 +2,8 @@ const std = @import("std");
 const algo_mod = @import("algo.zig");
 const vardiff = @import("vardiff.zig");
 const store_mod = @import("store.zig");
+const job = @import("job.zig");
+const validate = @import("validate.zig");
 
 pub const Config = struct {
     port: u16 = 3333,
@@ -32,8 +34,14 @@ pub const Server = struct {
     pub fn replyOk(id: []const u8, buf: []u8) []const u8 {
         return std.fmt.bufPrint(buf, "{{\"id\":{s},\"result\":true,\"error\":null}}", .{id}) catch buf[0..0];
     }
+    pub fn replyFail(id: []const u8, reason: []const u8, buf: []u8) []const u8 {
+        return std.fmt.bufPrint(buf, "{{\"id\":{s},\"result\":false,\"error\":[21,\"{s}\",null]}}", .{ id, reason }) catch buf[0..0];
+    }
     pub fn setDifficulty(diff: f64, buf: []u8) []const u8 {
         return std.fmt.bufPrint(buf, "{{\"id\":null,\"method\":\"mining.set_difficulty\",\"params\":[{d}]}}", .{diff}) catch buf[0..0];
+    }
+    pub fn notify(job_id: u64, buf: []u8) []const u8 {
+        return job.notify(job_id, buf);
     }
 
     pub fn serve(self: *Server) !void {
@@ -59,6 +67,7 @@ pub const Server = struct {
         defer _ = self.stats.sessions.fetchSub(1, .monotonic);
         var worker_buf: [64]u8 = [_]u8{0} ** 64;
         var worker_len: usize = 0;
+        var gate = validate.Gate{ .algo = self.cfg.algo, .difficulty = self.cfg.start_diff };
         var out: [512]u8 = undefined;
         sendLine(stream, setDifficulty(self.cfg.start_diff, &out));
         var buf: [4096]u8 = undefined;
@@ -70,7 +79,7 @@ pub const Server = struct {
             var search: usize = 0;
             while (std.mem.indexOfScalarPos(u8, buf[0..have], search, '\n')) |nl| {
                 const line = std.mem.trim(u8, buf[search..nl], " \t\r");
-                if (line.len > 0) handleLine(self, stream, line, &worker_buf, &worker_len);
+                if (line.len > 0) handleLine(self, stream, line, &worker_buf, &worker_len, &gate);
                 search = nl + 1;
             }
             if (search > 0) {
@@ -81,16 +90,21 @@ pub const Server = struct {
         }
     }
 
-    fn handleLine(self: *Server, stream: std.net.Stream, line: []const u8, worker_buf: *[64]u8, worker_len: *usize) void {
+    fn handleLine(self: *Server, stream: std.net.Stream, line: []const u8, worker_buf: *[64]u8, worker_len: *usize, gate: *validate.Gate) void {
         const method = extractJsonField(line, "method") orelse return;
         const id = extractJsonField(line, "id") orelse "null";
         var out: [512]u8 = undefined;
         if (std.mem.eql(u8, method, "mining.subscribe")) {
             _ = self.stats.subscribe.fetchAdd(1, .monotonic);
+            const jn = self.stats.subscribe.load(.monotonic);
+            var jbuf: [24]u8 = undefined;
+            const jid = std.fmt.bufPrint(&jbuf, "yr-{d}", .{jn}) catch "yr-0";
+            gate.setJob(jid);
             sendLine(stream, replySubscribe(id, "yr01", &out));
+            sendLine(stream, job.notify(jn, &out));
         } else if (std.mem.eql(u8, method, "mining.authorize")) {
             _ = self.stats.authorize.fetchAdd(1, .monotonic);
-            if (firstQuoted(line)) |w| {
+            if (paramAt(line, 0)) |w| {
                 const n = @min(w.len, worker_buf.len);
                 @memcpy(worker_buf[0..n], w[0..n]);
                 worker_len.* = n;
@@ -99,20 +113,34 @@ pub const Server = struct {
             sendLine(stream, replyOk(id, &out));
         } else if (std.mem.eql(u8, method, "mining.submit")) {
             _ = self.stats.submit.fetchAdd(1, .monotonic);
-            const w = if (worker_len.* > 0) worker_buf[0..worker_len.*] else "anon";
-            if (self.store) |st| st.accept(w, self.cfg.algo.name(), self.cfg.start_diff);
-            sendLine(stream, replyOk(id, &out));
+            const authorized = worker_len.* > 0;
+            const w = if (authorized) worker_buf[0..worker_len.*] else "anon";
+            const job_id = paramAt(line, 1) orelse "";
+            const nonce = paramAt(line, 4) orelse "";
+            const v = if (!authorized) validate.Verdict.bad_format else gate.check(job_id, nonce);
+            if (self.store) |st| {
+                if (v == .accept) st.accept(w, self.cfg.algo.name(), self.cfg.start_diff) else st.reject(w, self.cfg.algo.name(), self.cfg.start_diff);
+            }
+            if (v == .accept) sendLine(stream, replyOk(id, &out)) else sendLine(stream, replyFail(id, @tagName(v), &out));
         }
     }
 };
 
-fn firstQuoted(line: []const u8) ?[]const u8 {
+fn paramAt(line: []const u8, n: usize) ?[]const u8 {
     const p = std.mem.indexOf(u8, line, "\"params\"") orelse return null;
-    const q1 = std.mem.indexOfScalarPos(u8, line, p, '"') orelse return null;
-    const q2 = std.mem.indexOfScalarPos(u8, line, q1 + 1, '"') orelse return null;
-    const q3 = std.mem.indexOfScalarPos(u8, line, q2 + 1, '"') orelse return null;
-    const q4 = std.mem.indexOfScalarPos(u8, line, q3 + 1, '"') orelse return null;
-    return line[q3 + 1 .. q4];
+    var i = p;
+    var seen: usize = 0;
+    while (i < line.len) {
+        const q1 = std.mem.indexOfScalarPos(u8, line, i, '"') orelse return null;
+        const q2 = std.mem.indexOfScalarPos(u8, line, q1 + 1, '"') orelse return null;
+        const sl = line[q1 + 1 .. q2];
+        if (!std.mem.eql(u8, sl, "params")) {
+            if (seen == n) return sl;
+            seen += 1;
+        }
+        i = q2 + 1;
+    }
+    return null;
 }
 
 fn sendLine(stream: std.net.Stream, msg: []const u8) void {
